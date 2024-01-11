@@ -1,3 +1,4 @@
+import argparse
 import torch
 import numpy as np
 import torch.nn as nn
@@ -5,7 +6,6 @@ import torch.nn.functional as F
 import wandb
 from tqdm import tqdm
 import time
-import pandas as pd
 from torch.utils.data import Dataset
 import albumentations as A
 from torch.utils.data import DataLoader
@@ -14,27 +14,9 @@ from data_aug.data import train_test_split,GS1_dataset
 from UNET.UNet_model import UNet
 from monai.losses import DiceCELoss, DiceFocalLoss
 from utils import *
-import argparse
 from random import randint
-parser = argparse.ArgumentParser(description='Specify Parameters')
 
-parser.add_argument('lr', metavar='lr', type=float, help='Specify learning rate')
-parser.add_argument('b_s', metavar='b_s', type=int, help='Specify bach size')
-parser.add_argument('gpu_index', metavar='gpu_index', type=int, help='Specify which gpu to use')
-parser.add_argument('model', metavar='model', type=str, choices=['unet', 'swin_unetr', 'utnet'], help='Specify a model')
 
-parser.add_argument('norm_name', metavar='norm_name',  help='Specify a normalisation method')
-# parser.add_argument('model_text', metavar='model_text', type=str, help='Describe your mode')
-parser.add_argument('--base_c', metavar='--base_c', default = 12,type=int, help='base_channel which is the first output channel from first conv block')
-
-parser.add_argument('no_runs',metavar='no_runs',type=int,help='how many random seeds you want to run experiment on')
-
-args = parser.parse_args()
-lr, batch_size, gpu_index, model_name, norm_name,no_runs = args.lr, args.b_s, args.gpu_index, args.model, args.norm_name, args.no_runs
-base_c = args.base_c
-
-print(torch.cuda.is_available())
-device = torch.device(f'cuda:{gpu_index}' if torch.cuda.is_available() else 'cpu')
 def train_batch(images,labels,model,optimizer,criterion):
     images,labels = images.to(device,dtype=torch.float32),labels.to(device,dtype=torch.float32)
     outputs = model(images)
@@ -82,12 +64,12 @@ def test(model,test_loader,criterion,config,best_valid_score,example_ct):
 
     model.train()
 
-    if val_score > best_valid_score[0]:
-        data_str = f"Valid score improved from {best_valid_score[0]:2.8f} to {val_score:2.8f}. Saving checkpoint: {checkpoint_path_lowloss}"
-        print(data_str)
-        best_valid_score[0] = val_score
-        torch.save(model.state_dict(), config.low_loss_path)
-        save_model(config.low_loss_path,"low_loss_model")
+    # if val_score > best_valid_score[0]:
+    #     data_str = f"Valid score improved from {best_valid_score[0]:2.8f} to {val_score:2.8f}. Saving checkpoint: {checkpoint_path_lowloss}"
+    #     print(data_str)
+    #     best_valid_score[0] = val_score
+    #     torch.save(model.state_dict(), config.low_loss_path)
+    #     save_model(config.low_loss_path,"low_loss_model")
 
     return f1_score_record[2],f1_score_record[3]
 
@@ -126,8 +108,8 @@ def train(model, loader,test_loader, criterion, eval_criterion, config):
         data_str += f'\t Val Cup: {cup_loss:.8f}\n'
         data_str += f'\t Val Disk: {disk_loss:.8f}\n'
         print(data_str)
-    torch.save(model.state_dict(),config.final_path)
-    save_model(config.final_path,"final_model")
+    torch.save(model.state_dict(),config.low_loss_path)
+    #save_model(config.final_path,"final_model")
 
 
 
@@ -140,7 +122,7 @@ def get_data(train,gs1=False,rim=False,refuge_test=False,transform=False,return_
         return get_gs1_or_rim_data(train,transform,rim=True)
 
     if refuge_test:
-
+        #/Users/felixcohen
         x = sorted(glob(f"/home/kebl6872/Desktop/new_data/REFUGE2/test/image/*"))
         y = sorted(glob(f"/home/kebl6872/Desktop/new_data/REFUGE2/test/mask/*"))
         print(f'testing dataset of size: {len(x)}')
@@ -156,6 +138,7 @@ def get_data(train,gs1=False,rim=False,refuge_test=False,transform=False,return_
             dataset = 'Gamma'
         else:
             dataset = 'REFUGE2'
+
         x = sorted(glob(f"/home/kebl6872/Desktop/new_data/{dataset}/{dataset_type}/image/*"))
         y = sorted(glob(f"/home/kebl6872/Desktop/new_data/{dataset}/{dataset_type}/mask/*"))
         data_str = f"Training dataset size: {len(x)}"
@@ -178,7 +161,7 @@ def get_gs1_or_rim_data(train,transform,rim=False,):
         dataset = "RIMDL"
     else:
         dataset = "GS1"
-
+#/home/kebl6872/Desktop/
     gs1_x = sorted(glob(f"/home/kebl6872/Desktop/new_data/{dataset}/{dataset_type}/image/*"))
     gs1_c = sorted(glob(f"/home/kebl6872/Desktop/new_data/{dataset}/{dataset_type}/cup_mask/*"))
     gs1_d = sorted(glob(f"/home/kebl6872/Desktop/new_data/{dataset}/{dataset_type}/disc_mask/*"))
@@ -213,7 +196,7 @@ def make(config):
 
     return model,train_loader,test_loader,criterion,eval_criterion
 def model_pipeline(hyperparameters):
-    with wandb.init(project="Weak_UNet_experiment",config=hyperparameters):
+    with wandb.init(project="Weak_UNet_experiment",config=hyperparameters, dir = '/data/engs-mlmi1/kebl6872/wandb'):
         config = wandb.config
 
         model,train_loader,test_loader,criterion,eval_criterion = make(config)
@@ -223,12 +206,34 @@ def model_pipeline(hyperparameters):
 
     return model
 
+
+
 if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description='Specify Parameters')
+
+    parser.add_argument('lr', metavar='lr', type=float, help='Specify learning rate')
+    parser.add_argument('b_s', metavar='b_s', type=int, help='Specify bach size')
+    parser.add_argument('gpu_index', metavar='gpu_index', type=int, help='Specify which gpu to use')
+    parser.add_argument('--base_c', metavar='--base_c', default=12, type=int,
+                        help='base_channel which is the first output channel from first conv block')
+
+    parser.add_argument('no_runs', metavar='no_runs', type=int,
+                        help='how many random seeds you want to run experiment on')
+
+    args = parser.parse_args()
+    lr, batch_size, gpu_index, no_runs = args.lr, args.b_s, args.gpu_index, args.no_runs
+    base_c = args.base_c
+    norm_name = 'batch'
+    model_name = 'unet'
+    print(torch.cuda.is_available())
+    device = torch.device(f'cuda:{gpu_index}' if torch.cuda.is_available() else 'cpu')
+
     wandb.login(key='d40240e5325e84662b34d8e473db0f5508c7d40e')
 
     for a in ['REFUGE']:
         for _ in range(no_runs):
-            config = dict(epochs=5, classes=3, base_c = 12, kernels=[6,12,24,48], norm_name=norm_name,
+            config = dict(epochs=6, classes=3, base_c = 12, kernels=[6,12,24,48], norm_name=norm_name,
                           batch_size=batch_size, learning_rate=lr, dataset=a,
                           architecture=model_name,seed=401,transform=True)
             config["seed"] = randint(801,1000)
@@ -245,9 +250,9 @@ if __name__ == "__main__":
             checkpoint_path_lowloss = data_save_path + f'Checkpoint/seed/{config["seed"]}/lr_{lr}_bs_{batch_size}_lowloss.pth'
             checkpoint_path_final = data_save_path + f'Checkpoint/seed/{config["seed"]}/lr_{lr}_bs_{batch_size}_final.pth'
             create_file(checkpoint_path_lowloss)
-            create_file(checkpoint_path_final)
+            #create_file(checkpoint_path_final)
             config['low_loss_path']=checkpoint_path_lowloss
-            config['final_path'] = checkpoint_path_final
+            #config['final_path'] = checkpoint_path_final
 
             model = model_pipeline(config)
 

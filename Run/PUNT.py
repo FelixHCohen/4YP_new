@@ -4,7 +4,6 @@ from PromptUNet.PromptUNet import PromptUNet,pointLoss,NormalisedFocalLoss,combi
 from utils import *
 import glob
 from monai.losses import DiceLoss
-from torch.utils import data
 
 def prompt_train_log(loss,example_ct,epoch):
     wandb.log({"epoch": epoch,"attention training loss":loss},step=example_ct)
@@ -67,7 +66,7 @@ def initial_test(images,labels,model,criterion,):
     outputs = outputs.softmax(dim=1).argmax(dim=1).unsqueeze(dim=1)
     score = criterion(outputs,labels)
     plot_output(outputs,images,labels,score[1],point_tuples)
-def prompt_test(model,test_loader,criterion,config,best_valid_score,example_ct,optimizer,num_points=6,plot=False):
+def prompt_test(model,test_loader,criterion,config,best_valid_score,example_ct,num_points=6,plot=False):
     model.eval()
 
     with torch.no_grad():
@@ -144,7 +143,7 @@ def prompt_test(model,test_loader,criterion,config,best_valid_score,example_ct,o
     wandb.log(data_to_log,step=example_ct)
     model.train()
 
-    if val_scores[-1] > best_valid_score[0] and val_scores[-1] > 0.5:
+    if val_scores[-1] > best_valid_score[0] and val_scores[-1] > 50.0:
         data_str = f"Valid score for point {len(val_scores)} improved from {best_valid_score[0]:2.8f} to {val_scores[-1]:2.8f}. Saving checkpoint: {config.low_loss_path}"
         #print(data_str)
         best_valid_score[0] = val_scores[-1]
@@ -162,25 +161,18 @@ def prompt_train(model, loader,test_loader, criterion, eval_criterion, config,pa
 
     optimizer = torch.optim.Adam(model.parameters(), lr)
 
-
     # if prev run has crashed reload model weights and adam optimizer
     if path:
         checkpoint = torch.load(path)
         model.load_state_dict(checkpoint['model_state_dict'],strict=False)
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        lambda_lr = lambda batch: 0.5**(1 + batch//5000)
-        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda_lr)
-
-    else:
-        lambda_lr = lambda batch: 10 ** (batch // 25000)
-        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda_lr)
 
     #unet_path = "/home/kebl6872/Desktop/new_data/REFUGE/test/unet_batch_lr_0.0003_bs_16_fs_12_[6_12_24_48]/Checkpoint/seed/279/lr_0.0003_bs_16_lowloss.pth"
     #unet_path = "/home/kebl6872/Desktop/new_data/GAMMA/test/promptunet_batch_lr_0.0005_bs_8_fs_12_[6_12_24_48]/Checkpoint/seed/647/lr_0.0005_bs_8_lowloss.pth"
     #check_point = torch.load(unet_path)
     #check_point = {k: v for k, v in check_point.items() if not k.startswith("d")}
     #model.load_state_dict(check_point, strict=False)
-    wandb.watch(model,criterion,log='all',log_freq=350) #this is freq of gradient recordings (set to high number to reduce size of .wandb file)
+    wandb.watch(model,criterion,log='all',log_freq=250) #this is freq of gradient recordings (set to high number to reduce size of .wandb file)
 
     example_ct = 0
 
@@ -190,7 +182,7 @@ def prompt_train(model, loader,test_loader, criterion, eval_criterion, config,pa
         print(f'batch_ct: {batch_ct}')
         weak_unet_epochs = -1
     else:
-        weak_unet_epochs= 2 # this is needed as when prediction is atrocious, connected component runtime increases greatly therefore use weak unet to gen points
+        weak_unet_epochs=2 # this is needed as when prediction is atrocious, connected component runtime increases greatly therefore use weak unet to gen points
         batch_ct = 0
 
     best_valid_score = [0.0] #in list so I can alter it in test function
@@ -208,7 +200,7 @@ def prompt_train(model, loader,test_loader, criterion, eval_criterion, config,pa
 
         for _,(images, labels) in enumerate(loader):
             #start = time.perf_counter()
-            points, point_labels, weak_unet_preds = gen_points_from_weak_unet_batch(images, labels, model,config.device,weak_unet,10)
+            points, point_labels, weak_unet_preds = gen_points_from_weak_unet_batch(images, labels, model,config.device,weak_unet)
             #end = time.perf_counter()
            # print(f'point generation time: {end-start}s')
             if counter%1==0:
@@ -223,14 +215,14 @@ def prompt_train(model, loader,test_loader, criterion, eval_criterion, config,pa
             counter+=1
 
             loss,pl,gl = prompt_train_batch(images,labels,points,point_labels,weak_unet_preds,model,optimizer,criterion,config,plot)
-            scheduler.step()
+
             avg_epoch_loss += loss
             example_ct += len(images)
             batch_ct +=1
 
-            if ((batch_ct+1) % 80) == 0:
+            if ((batch_ct+1) % 30) == 0:
                 print(f' batch: {batch_ct + 1} point loss: {pl} general loss: {gl}')
-            if ((batch_ct+1) % 180 )==0:
+            if ((batch_ct+1) % 50 )==0:
                 prompt_train_log(loss,batch_ct,epoch)
 
 
@@ -239,8 +231,8 @@ def prompt_train(model, loader,test_loader, criterion, eval_criterion, config,pa
         iteration_mins, iteration_secs = train_time(start_time, end_time)
         print(f'train time: {iteration_mins}m {iteration_secs}s')
 
-        if (epoch % 6 == 0 and epoch >= 3) or (epoch % 2 == 0 and epoch >= 200):
-            test_results = prompt_test(model,test_loader,eval_criterion,config,best_valid_score,batch_ct,optimizer)
+        if (epoch % 6 == 0 and epoch >= 3) or (epoch % 2 == 0 and epoch >= 160):
+            test_results = prompt_test(model,test_loader,eval_criterion,config,best_valid_score,batch_ct)
             avg_epoch_loss/=len(loader)
             test_end_time = time.time()
 
@@ -421,9 +413,9 @@ def gen_points_from_weak_unet(y_true, image, device, model, num_points,weak_unet
 
     return res,weak_unet_pred_o
 
-def gen_points_from_weak_unet_batch(images,y_true,model,device,weak_unet,num_points=9):
+def gen_points_from_weak_unet_batch(images,y_true,model,device,weak_unet):
 
-    num_points = random.randint(1,num_points)
+    num_points = random.randint(1,10)
     B = y_true.shape[0]
 
     points = np.zeros((B,num_points,2))
@@ -476,7 +468,7 @@ def prompt_make(config):
 def prompt_model_pipeline(hyperparameters,prev_paths=None):
     # prev paths should take form {'run_id': ___ 'model_path': ___.pth} (run_id can be found in the url of desired run at wandb website)
     if prev_paths:
-        with wandb.init(project="ARC", config=hyperparameters, dir='/data/engs-mlmi1/kebl6872/wandb'): # ,id = prev_paths['run_id'],resume = 'must')
+        with wandb.init(project="ARC", config=hyperparameters, dir='/data/engs-mlmi1/kebl6872/wandb',id = prev_paths['run_id'],resume = 'must'):
             print('initialising from prev run')
             config = wandb.config
 
@@ -523,8 +515,8 @@ if __name__ == "__main__":
     print('parsed args')
     wandb.login(key='d40240e5325e84662b34d8e473db0f5508c7d40e')
 
-    config = dict(epochs=epochs, classes=3, base_c = base_c, kernels=kernels,attention_kernels=attention_kernels,d_model=d_model,batch_size=batch_size, learning_rate=lr, dataset="GAMMA",seed=401,transform=True,device=device,batch_norm=False)
-    config["seed"] = randint(801,1000)
+    config = dict(epochs=epochs, classes=3, base_c = base_c, kernels=kernels,attention_kernels=attention_kernels,d_model=d_model,batch_size=batch_size, learning_rate=lr, dataset="GAMMA",seed=401,transform=True,device=device,batch_norm=True)
+    config["seed"] = randint(201,400)
     seeding(config["seed"])
 
   # for home: /Users/felixcohen/ for arc: /home/kebl6872/Desktop
@@ -540,9 +532,5 @@ if __name__ == "__main__":
 
     prev_paths = {}
     prev_paths['run_id'] = 'owlr25mz'
-    prev_paths['model_path'] =  "/data/engs-mlmi1/kebl6872/data/models/PromptUNet_lr_0.0005_bs_10_fs_12_[6_12_24_48]_3_2_5_5]/Checkpoint/seed/953/lr_0.0005_bs_10_lowloss.pth"
-    model = prompt_model_pipeline(config,prev_paths) # note to self get wandb resume functionality working
-
-
-
-
+    prev_paths['model_path'] = "/data/engs-mlmi1/kebl6872/data/models/PromptUNet_lr_0.0006_bs_14_fs_12_[6_12_24_48]_3_2_5_5]/Checkpoint/seed/399/lr_0.0006_bs_14_lowloss.pth"
+    model = prompt_model_pipeline(config,prev_paths)

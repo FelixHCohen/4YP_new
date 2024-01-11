@@ -3,7 +3,6 @@ import cv2
 import torch
 from torch.utils.data import Dataset
 import albumentations as A
-import pandas as pd
 from albumentations import (
     Compose,
     CLAHE,
@@ -221,51 +220,6 @@ class RIMDL_dataset(GS1_dataset):
         mask = torch.from_numpy(mask)  # (1,512,512)
 
         return image, mask
-
-class small_prompt_dataset(Dataset):
-
-    def __init__(self,df):
-        super().__init__()
-
-        self.image_paths = df['image_path']
-        self.mask_paths = df['mask_path']
-        self.i0 = df['i0']
-        self.i1 = df['i1']
-        self.i2 = df['i2']
-        self.i3 = df['i3']
-        self.j0 = df['j0']
-        self.j1 = df['j1']
-        self.j2 = df['j2']
-        self.j3 = df['j3']
-        self.v0 = df['v0']
-        self.v1 = df['v1']
-        self.v2 = df['v2']
-        self.v3 = df['v3']
-
-    def __getitem__(self,index):
-
-        image = cv2.imread(self.image_paths[index][2:-3], cv2.IMREAD_COLOR)
-        mask = cv2.imread(self.mask_paths[index][2:-3], cv2.IMREAD_GRAYSCALE)
-
-        mask = np.where(mask < 128, 2, mask)  # set cup values to 2
-        mask = np.where(mask == 128, 1, mask)  # disc pixels sset to 1
-        mask = np.where(mask > 128, 0, mask)  # background pixels set to 0
-        image = (image - 127.5) / 127.5
-        image = np.transpose(image, (2, 0, 1))
-        image = image.astype(np.float32)
-        image = torch.from_numpy(image)  # (3,512,512)
-        mask = mask.astype(np.int64)
-        mask = np.expand_dims(mask, axis=0)
-        mask = torch.from_numpy(mask)  # (1,512,512)
-        p0 = (self.i0[index],self.j0[index],self.v0[index])
-        p1 = (self.i1[index], self.j1[index], self.v1[index])
-        p2 = (self.i2[index], self.j2[index], self.v2[index])
-        p3 = (self.i3[index], self.j2[index], self.v3[index])
-        points = torch.tensor([p0,p1,p2,p3,])
-
-        return image,mask,points
-    def __len__(self):
-        return len(self.image_paths)
 
 
 

@@ -8,8 +8,7 @@ import torch.nn as nn
 from glob import glob
 import random
 import matplotlib.pyplot as plt
-from pode import Contour, Polygon, divide, Requirement,Point
-from pode import joined_constrained_delaunay_triangles
+
 
 def seeding(seed):  # seeding the randomness
     random.seed(seed)
