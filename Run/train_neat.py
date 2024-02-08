@@ -122,7 +122,7 @@ def get_data(train,gs1=False,rim=False,refuge_test=False,transform=False,return_
         return get_gs1_or_rim_data(train,transform,rim=True)
 
     if refuge_test:
-        #/Users/felixcohen
+        #/Users/felixcohen /home/kebl6872/
         x = sorted(glob(f"/home/kebl6872/Desktop/new_data/REFUGE2/test/image/*"))
         y = sorted(glob(f"/home/kebl6872/Desktop/new_data/REFUGE2/test/mask/*"))
         print(f'testing dataset of size: {len(x)}')
@@ -150,6 +150,11 @@ def get_data(train,gs1=False,rim=False,refuge_test=False,transform=False,return_
 
 
     return dataset
+
+# def get_riga_data(transform,messidor=True,br=False,mag=False)
+#     if messidor:
+#         dataset = 'MESSIDOR'
+#     elif br:
 
 def get_gs1_or_rim_data(train,transform,rim=False,):
     if train:
@@ -233,7 +238,7 @@ if __name__ == "__main__":
 
     for a in ['REFUGE']:
         for _ in range(no_runs):
-            config = dict(epochs=6, classes=3, base_c = 12, kernels=[6,12,24,48], norm_name=norm_name,
+            config = dict(epochs=60, classes=3, base_c = 12, kernels=[6,12,24,48], norm_name=norm_name,
                           batch_size=batch_size, learning_rate=lr, dataset=a,
                           architecture=model_name,seed=401,transform=True)
             config["seed"] = randint(801,1000)

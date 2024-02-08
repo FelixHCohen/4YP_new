@@ -16,20 +16,29 @@ def plot_img(data):
     plt.imshow(img_gray)
     plt.show()
 
-def resize_data(images,masks,save_path,name_add = ''):
+def resize_data(images,masks,save_path,name_add = '',pad=False):
     size = (512,512)
     size_reg = set()
     for idx, (x,y) in tqdm(enumerate(zip(images,masks))):
+
         name = x.split("/")[-1].split(".")[0]
         name = f'{name_add}{name}'
+
         img = cv2.imread(x,cv2.IMREAD_COLOR)
+        mask = cv2.imread(y)
+
         delta = img.shape[1]-img.shape[0]
         size_reg.add(img.shape)
         d1 = delta//2
         d2 = delta - delta//2
-        img = img[:,d1:-1*d2,:] # cut off sides to make aspect ratio more similar to 1:1 to avoid distortion
-        mask = cv2.imread(y)
-        mask = mask[:,d1:-1*d2,:]
+
+        if not pad:
+            img = img[:,d1:-1*d2,:] # cut off sides to make aspect ratio more similar to 1:1 to avoid distortion
+            mask = mask[:,d1:-1*d2,:]
+        else:
+            img = np.pad(img, ((d1, d2), (0, 0), (0, 0)), mode='constant', constant_values=0)
+            mask = np.pad(mask, ((d1, d2), (0, 0), (0, 0)), mode='constant', constant_values=0)
+
         tmp_image_name = f"{name}.png"
         tmp_mask_name = f"{name}_mask.png"
         image_path = os.path.join(save_path, "image", tmp_image_name)
@@ -82,7 +91,7 @@ for p in mag_paths:
     create_dir(f'{p}/image/')
     create_dir(f'{p}/mask/')
 for imgs,masks,name_add,path in zip(magrabia_images,magrabia_masks,mag_names,mag_paths):
-    resize_data(imgs,masks,path,name_add)
+    resize_data(imgs,masks,path,name_add,pad=True)
 # for sp in save_paths:
 #     create_dir(f'{sp}/image/')
 #     create_dir(f'{sp}/mask/')

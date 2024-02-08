@@ -19,10 +19,10 @@ class FFN(nn.Module):
         self.linear_1 = nn.Linear(d_model, d_ff)
         self.dropout = nn.Dropout(dropout)
         self.linear_2 = nn.Linear(d_ff, d_model)
-
+        self.m = torch.nn.ReLU()
     def forward(self, x):
         # (batch, seq_len, d_model) --> (batch, seq_len, d_ff) --> (batch, seq_len, d_model)
-        return self.linear_2(self.dropout(torch.relu(self.linear_1(x))))
+        return self.linear_2(self.dropout(self.m(self.linear_1(x))))
 
 
 class MultiHeadAttentionLayer(nn.Module):
@@ -60,10 +60,14 @@ class SelfAttentionBlock(nn.Module):
         x = self.res_connection2(x,self.FFN)
         return x
 class PromptEncoder(nn.Module):
-     def __init__(self,device,pe_layer,d_model=384, input_image_size=(512,512), num_heads = 8,num_blocks=4, dropout=0.1):
+     def __init__(self,device,pe_layer,d_model=384, input_image_size=(512,512), num_heads = 8,num_blocks=4, dropout=0.1,box=False):
         super().__init__()
         self.device = device
-        self.promptEmbedder = PromptEmbedder(pe_layer,d_model,input_image_size,device)
+        if box:
+            self.promptEmbedder = BoxPromptEmbedder(pe_layer,d_model,input_image_size,device)
+        else:
+            self.promptEmbedder = PromptEmbedder(pe_layer,d_model,input_image_size,device)
+
         self.self_attns = nn.ModuleList([SelfAttentionBlock(d_model, num_heads,dropout) for _ in range(num_blocks)])
         self.ln = nn.LayerNorm(d_model)
      def forward(self,points,labels): # point tensor should be BxLx(x,y) label tensor should be BxLx1

@@ -43,7 +43,7 @@ class PromptEmbedder(nn.Module):
     def __init__(
         self,pe_layer,
         embed_dim: int,
-        input_image_size: Tuple[int, int],device
+        input_image_size: Tuple[int, int],device,num_point_embeddings=3,
     ) -> None:
 
         super().__init__()
@@ -52,7 +52,7 @@ class PromptEmbedder(nn.Module):
 
         self.pe_layer = pe_layer # for every b_i vector, a cos(b_i^Tx) and sin(b_i^Tx) output is created therefore half embed_dim
 
-        self.num_point_embeddings: int = 3  # cup disc and background classes
+        self.num_point_embeddings: int = num_point_embeddings  # cup disc and background classes
         point_embeddings = [nn.Embedding(1, embed_dim,device=device) for i in range(self.num_point_embeddings)]
         self.point_embeddings = nn.ModuleList(point_embeddings)
         self.not_a_point_embed = nn.Embedding(1, embed_dim) # for padding class
@@ -93,5 +93,43 @@ class PromptEmbedder(nn.Module):
 
         return point_embedding
 
+class BoxPromptEmbedder(PromptEmbedder):
+    def __init__(
+        self,pe_layer,
+        embed_dim: int,
+        input_image_size: Tuple[int, int],device,num_point_embeddings=7,
+    ) -> None:
+        super().__init__(pe_layer,embed_dim,input_image_size,device,num_point_embeddings)
 
+
+    def forward(
+        self,
+        points: torch.Tensor,
+        labels: torch.Tensor,
+        pad: bool,
+    ) -> torch.Tensor:
+        """Embeds point prompts."""
+        points = points + 0.5  # Shift to center of pixel
+        if pad:
+            padding_point = torch.zeros((points.shape[0], 1, 2), device=points.device)
+            padding_label = -torch.ones((labels.shape[0], 1), device=labels.device)
+            points = torch.cat([points, padding_point], dim=1)
+            labels = torch.cat([labels, padding_label], dim=1)
+
+        point_embedding = self.pe_layer.forward_with_coords(points, self.input_image_size)
+        # point_embedding[
+        #     labels == -1] = 0.0  # set padded point embeddings to 0 (have been put thru point_embedding func)
+        # point_embedding[
+        #     labels == -1] += self.not_a_point_embed.weight  # set padded point embeddings to not a point signifier
+
+
+        point_embedding[labels.squeeze(-1) == 0] += self.point_embeddings[0].weight
+        point_embedding[labels.squeeze(-1) == 1] += self.point_embeddings[1].weight
+        point_embedding[labels.squeeze(-1) == 2] += self.point_embeddings[2].weight
+        point_embedding[labels.squeeze(-1) == 3] += self.point_embeddings[3].weight
+        point_embedding[labels.squeeze(-1) == 4] += self.point_embeddings[4].weight
+        point_embedding[labels.squeeze(-1) == 5] += self.point_embeddings[5].weight
+        point_embedding[labels.squeeze(-1) == 6] += self.point_embeddings[6].weight
+
+        return point_embedding
 

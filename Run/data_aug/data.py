@@ -95,6 +95,43 @@ class train_test_split(Dataset):
     def __len__(self):
         return self.num_samples
 
+class RIGA_dataset(train_test_split):
+
+    def __init__(self, images_path, masks_path, disc_only=False, transform=False, return_path=False):
+        super().__init__(images_path,masks_path,disc_only,transform,return_path)
+
+    def __getitem__(self, index):
+        image = cv2.imread(self.images_path[index], cv2.IMREAD_COLOR)
+        mask = cv2.imread(self.masks_path[index], cv2.IMREAD_GRAYSCALE)
+        mask = np.where(mask == 128, 2, mask)  # set cup values to 2
+        mask = np.where(mask == 256, 1, mask)  # disc pixels sset to 1
+
+        if self.transform:
+            augmented = self.transform(image=image,mask=mask)
+            image = augmented["image"]
+            mask = augmented["mask"]
+
+        '''Normalise tensity in range [-1,-1]'''
+        image = (image-127.5)/127.5
+        image = np.transpose(image, (2, 0, 1))
+        image = image.astype(np.float32)
+        image = torch.from_numpy(image)      # (3,512,512)
+
+        """ Reading mask """
+
+
+        if self.disc_only:
+            mask = np.where(mask == 2, 1, mask)  # set cup values to 2
+
+        mask = mask.astype(np.int64)
+        mask = np.expand_dims(mask, axis=0)
+        mask = torch.from_numpy(mask)        # (1,512,512)
+        if self.return_path == True:
+            res = image, mask,self.images_path[index],self.masks_path[index]
+        else:
+            res = image,mask
+
+        return res
 class crop_dataset(train_test_split):
 
     def __init__(self,images_path,masks_path,disc_only=False,transform=False):
@@ -147,7 +184,7 @@ class GS1_dataset(Dataset):
         self.num_samples = len(images_path)
         self.disc_only = disc_only
         if transform:
-            self.transform = basic_transform
+            self.transform = intensity_aug()
         else:
             self.transform = False
 
