@@ -29,9 +29,9 @@ class MultiHeadAttentionLayer(nn.Module):
     def __init__(self, d_model=384, num_heads=4, dropout=0.1):
         super().__init__()
 
-        self.w_k = nn.Linear(d_model, d_model, bias=False)
-        self.w_q = nn.Linear(d_model, d_model, bias=False)
-        self.w_v = nn.Linear(d_model, d_model, bias=False)
+        # self.w_k = nn.Linear(d_model, d_model, bias=False)
+        # self.w_q = nn.Linear(d_model, d_model, bias=False)
+        # self.w_v = nn.Linear(d_model, d_model, bias=False)
 
         self.attn_layer = nn.MultiheadAttention(d_model, num_heads, dropout, batch_first=True)
 
@@ -39,11 +39,11 @@ class MultiHeadAttentionLayer(nn.Module):
 
     def forward(self, x):  # x_shape = B,L+1,d_model
 
-        Q = self.w_q(x)
-        K = self.w_k(x)
-        V = self.w_v(x)
-        attn_output = self.attn_layer(Q, K, V, need_weights=False)
-
+        # Q = self.w_q(x)
+        # K = self.w_k(x)
+        # V = self.w_v(x)
+        # attn_output = self.attn_layer(Q, K, V, need_weights=False)
+        attn_output = self.attn_layer(x,x,x, need_weights=False)
         return attn_output[0]
 
 class SelfAttentionBlock(nn.Module):

@@ -66,9 +66,9 @@ class MultiHeadCrossAttentionLayer(nn.Module):
     def __init__(self, d_model=384, num_heads=4, dropout=0.1):
         super().__init__()
 
-        self.w_k = nn.Linear(d_model, d_model, bias=False)
-        self.w_q = nn.Linear(d_model, d_model, bias=False)
-        self.w_v = nn.Linear(d_model, d_model, bias=False)
+        # self.w_k = nn.Linear(d_model, d_model, bias=False)
+        # self.w_q = nn.Linear(d_model, d_model, bias=False)
+        # self.w_v = nn.Linear(d_model, d_model, bias=False)
 
         self.attn_layer = nn.MultiheadAttention(d_model, num_heads, dropout, batch_first=True)
 
@@ -76,13 +76,15 @@ class MultiHeadCrossAttentionLayer(nn.Module):
 
     def forward(self, q_tensors,kv_tensors,attn_mask=False):  # x_shape = B,L+1,d_model
 
-        Q = self.w_q(q_tensors)
-        K = self.w_k(kv_tensors)
-        V = self.w_v(kv_tensors)
+        # Q = self.w_q(q_tensors)
+        # K = self.w_k(kv_tensors)
+        # V = self.w_v(kv_tensors)
         if torch.is_tensor(attn_mask):
-            attn_output = self.attn_layer(Q,K,V,need_weights=False,attn_mask=attn_mask)
+            # attn_output = self.attn_layer(Q,K,V,need_weights=False,attn_mask=attn_mask)
+            attn_output = self.attn_layer(q_tensors, kv_tensors, kv_tensors, need_weights=False, attn_mask=attn_mask)
         else:
-            attn_output = self.attn_layer(Q, K, V, need_weights=False)
+            # attn_output = self.attn_layer(Q, K, V, need_weights=False)
+            attn_output = self.attn_layer(q_tensors, kv_tensors, kv_tensors, need_weights=False)
 
         return attn_output[0]
 
@@ -127,14 +129,17 @@ class CrossAttentionBlock(nn.Module):
         # prompts_input = self.res_connection2(prompts_input, self.FFN)
         # images = self.res_connection3(images, prompts_input, self.CrossAttention2,attn_mask)
         # images = self.res_connection4(images, pos_encodings, add_pos, self.FFN2)
-
-        images = self.res_connection3(images, prompts_input, self.CrossAttention2)
-        images = self.res_connection4(images, pos_encodings, add_pos, self.FFN2)
         prompts_input = self.res_connection1(prompts_input, images, self.CrossAttention1, attn_mask)
         prompts_input = self.res_connection2(prompts_input, self.FFN)
-
-
         prompts_output = prompts_input + original_prompts
+
+        images = self.res_connection3(images, prompts_output, self.CrossAttention2)
+        images = self.res_connection4(images, pos_encodings, add_pos, self.FFN2)
+
+
+
+
+
         return images,prompts_output
 
 class ImageEncoder(nn.Module):

@@ -123,8 +123,8 @@ def get_data(train,gs1=False,rim=False,refuge_test=False,transform=False,return_
 
     if refuge_test:
         #/Users/felixcohen /home/kebl6872/
-        x = sorted(glob(f"/home/kebl6872/Desktop/new_data/REFUGE2/test/image/*"))
-        y = sorted(glob(f"/home/kebl6872/Desktop/new_data/REFUGE2/test/mask/*"))
+        x = sorted(glob(f"/users/kebl6872/Desktop/new_data/REFUGE2/test/image/*"))
+        y = sorted(glob(f"/users/kebl6872/Desktop/new_data/REFUGE2/test/mask/*"))
         print(f'testing dataset of size: {len(x)}')
     else:
         if train:
@@ -139,8 +139,8 @@ def get_data(train,gs1=False,rim=False,refuge_test=False,transform=False,return_
         else:
             dataset = 'REFUGE2'
 
-        x = sorted(glob(f"/home/kebl6872/Desktop/new_data/{dataset}/{dataset_type}/image/*"))
-        y = sorted(glob(f"/home/kebl6872/Desktop/new_data/{dataset}/{dataset_type}/mask/*"))
+        x = sorted(glob(f"/users/kebl6872/Desktop/new_data/{dataset}/{dataset_type}/image/*"))
+        y = sorted(glob(f"/users/kebl6872/Desktop/new_data/{dataset}/{dataset_type}/mask/*"))
         data_str = f"Training dataset size: {len(x)}"
         print(data_str)
 
@@ -167,9 +167,9 @@ def get_gs1_or_rim_data(train,transform,rim=False,):
     else:
         dataset = "GS1"
 #/home/kebl6872/Desktop/
-    gs1_x = sorted(glob(f"/home/kebl6872/Desktop/new_data/{dataset}/{dataset_type}/image/*"))
-    gs1_c = sorted(glob(f"/home/kebl6872/Desktop/new_data/{dataset}/{dataset_type}/cup_mask/*"))
-    gs1_d = sorted(glob(f"/home/kebl6872/Desktop/new_data/{dataset}/{dataset_type}/disc_mask/*"))
+    gs1_x = sorted(glob(f"/users/kebl6872/Desktop/new_data/{dataset}/{dataset_type}/image/*"))
+    gs1_c = sorted(glob(f"/users/kebl6872/Desktop/new_data/{dataset}/{dataset_type}/cup_mask/*"))
+    gs1_d = sorted(glob(f"/users/kebl6872/Desktop/new_data/{dataset}/{dataset_type}/disc_mask/*"))
     data_str = f"{dataset_type} dataset size: {len(gs1_x)}"
     print(data_str)
 

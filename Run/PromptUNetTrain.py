@@ -1,6 +1,6 @@
 import cv2
 from train_neat import *
-from PromptUNet.PromptUNet import PromptUNet,pointLoss,NormalisedFocalLoss,combine_loss,combine_point_loss
+from PromptUNet.PromptUNet import PromptUNet,pointLoss,NormalisedFocalLoss,combine_loss,combine_point_loss,SymmetricPromptUNet
 from utils import *
 from PromptUNet.MaskedPromptUNet import MaskedPromptUNet
 import glob
@@ -191,7 +191,7 @@ def prompt_train(model, loader,test_loader, criterion, eval_criterion, config,pa
     #check_point = torch.load(unet_path)
     #check_point = {k: v for k, v in check_point.items() if not k.startswith("d")}
     #model.load_state_dict(check_point, strict=False)
-    wandb.watch(model,criterion,log='all',log_freq=400) #this is freq of gradient recordings (set to high number to reduce size of .wandb file)
+    wandb.watch(model,criterion,log='all',log_freq=60) #this is freq of gradient recordings (set to high number to reduce size of .wandb file)
 
     example_ct = 0
     batch_ct = 0
@@ -236,9 +236,9 @@ def prompt_train(model, loader,test_loader, criterion, eval_criterion, config,pa
             example_ct += len(images)
             batch_ct +=1
 
-            if ((batch_ct+1) % 80) == 0:
+            if ((batch_ct+1) % 20) == 0:
                 print(f' batch: {batch_ct + 1} point loss: {pl} general loss: {gl}')
-            if ((batch_ct+1) % 200 )==0:
+            if ((batch_ct+1) % 100 )==0:
                 prompt_train_log(loss,batch_ct,epoch)
 
 
@@ -374,7 +374,7 @@ def gen_points_from_weak_unet(y_true, image, device, model, num_points,weak_unet
         weak_unet_pred = model(image,point_input,point_label_input)
 
     else:
-        model_paths = glob.glob(f'/home/kebl6872/Desktop/weakunet/Checkpoint/seed/**/*lowloss.pth', recursive=True)
+        model_paths = glob.glob(f'/users/kebl6872/Desktop/weakunet/Checkpoint/seed/**/*lowloss.pth', recursive=True)
         index = random.randint(0, len(model_paths)  - 1)
         weakUNet = make_weakUNet(model_paths[index])
         weakUNet = weakUNet.to(device)
@@ -573,20 +573,20 @@ def prompt_make(config):
     criterion = NormalisedFocalLoss()
     diceFocal = combine_loss(criterion,criterion1,0.7)
     criterion2 = pointLoss(radius=10)
-    pointCriterion = combine_point_loss(criterion2,diceFocal,alpha = 240,beta=1)
+    pointCriterion = combine_point_loss(criterion2,diceFocal,alpha = 200,beta=1)
 
     if config.masked:
         model = MaskedPromptUNet(config.device,3,config.classes,config.base_c,kernels=config.kernels,attention_kernels=config.attention_kernels,d_model=config.d_model,dropout=0.1,batch_norm=config.batch_norm)
 
     else:
-        model = PromptUNet(config.device,3,config.classes,config.base_c,kernels=config.kernels,attention_kernels=config.attention_kernels,d_model=config.d_model,dropout=0.1,batch_norm=config.batch_norm,box=config.box)
+        model = SymmetricPromptUNet(config.device,3,config.classes,config.base_c,kernels=config.kernels,attention_kernels=config.attention_kernels,d_model=config.d_model,dropout=0.1,batch_norm=config.batch_norm,box=config.box)
 
 
     return model,train_loader,test_loader,pointCriterion,eval_criterion
 def prompt_model_pipeline(hyperparameters,prev_paths=None):
     # prev paths should take form {'run_id': ___ 'model_path': ___.pth} (run_id can be found in the url of desired run at wandb website)
     if prev_paths:
-        with wandb.init(project="ARC", config=hyperparameters, dir='/data/engs-mlmi1/kebl6872/wandb'): # ,id = prev_paths['run_id'],resume = 'must')
+        with wandb.init(project="IBME", config=hyperparameters, dir='/data/kebl6872/wandb'): # ,id = prev_paths['run_id'],resume = 'must')
             print('initialising from prev run')
             config = wandb.config
 
@@ -595,7 +595,7 @@ def prompt_model_pipeline(hyperparameters,prev_paths=None):
             model = model.to(config.device)
             prompt_train(model, train_loader, test_loader, criterion, eval_criterion, config, path = prev_paths['model_path'])
     else:
-        with wandb.init(project="ARC",config=hyperparameters,dir = '/data/engs-mlmi1/kebl6872/wandb' ): #dir = '/data/engs-mlmi1/kebl6872/wandb'
+        with wandb.init(project="IBME",config=hyperparameters,dir = '/data/kebl6872/wandb' ): #dir = '/data/engs-mlmi1/kebl6872/wandb'
             config = wandb.config
 
             model,train_loader,test_loader,criterion,eval_criterion = prompt_make(config)
@@ -630,12 +630,13 @@ if __name__ == "__main__":
 
 
     device = (torch.device('cuda:0') if torch.cuda.is_available() else 'cpu')
+    print(f'gpu is available: {torch.cuda.is_available()}')
 
 
     print('parsed args')
     wandb.login(key='d40240e5325e84662b34d8e473db0f5508c7d40e')
 
-    config = dict(epochs=epochs, classes=3, base_c = base_c, kernels=kernels,attention_kernels=attention_kernels,d_model=d_model,batch_size=batch_size, learning_rate=lr,home_comp = False, dataset="GAMMA",seed=401,transform=True,device=device,batch_norm=False,masked=True,box=False)
+    config = dict(epochs=epochs, classes=3, base_c = base_c, kernels=kernels,attention_kernels=attention_kernels,d_model=d_model,batch_size=batch_size, learning_rate=lr,home_comp = False, dataset="GAMMA",seed=401,transform=True,device=device,batch_norm=False,masked=False,box=False)
     config["seed"] = randint(801,1000)
     seeding(config["seed"])
 
@@ -644,9 +645,9 @@ if __name__ == "__main__":
   # for home: /Users/felixcohen/ for arc: /home/kebl6872/Desktop
 
     if config["home_comp"]:
-        data_save_path = f'../../Users/felixcohen/data/engs-mlmi1/kebl6872/data/models/PromptUNet_lr_{lr}_bs_{batch_size}_fs_{config["base_c"]}_[{"_".join(str(k) for k in config["kernels"])}]_{"_".join(str(k) for k in config["attention_kernels"])}]/'
+        data_save_path = f'../../Users/felixcohen/data/kebl6872/data/models/PromptUNet_lr_{lr}_bs_{batch_size}_fs_{config["base_c"]}_[{"_".join(str(k) for k in config["kernels"])}]_{"_".join(str(k) for k in config["attention_kernels"])}]/'
     else:
-        data_save_path = f'/data/engs-mlmi1/kebl6872/data/models/PromptUNet_lr_{lr}_bs_{batch_size}_fs_{config["base_c"]}_[{"_".join(str(k) for k in config["kernels"])}]_{"_".join(str(k) for k in config["attention_kernels"])}]/'
+        data_save_path = f'/data/kebl6872/data/models/PromptUNet_lr_{lr}_bs_{batch_size}_fs_{config["base_c"]}_[{"_".join(str(k) for k in config["kernels"])}]_{"_".join(str(k) for k in config["attention_kernels"])}]/'
     create_dir(data_save_path + f'Checkpoint/seed/{config["seed"]}')
     checkpoint_path_lowloss = data_save_path + f'Checkpoint/seed/{config["seed"]}/lr_{lr}_bs_{batch_size}_lowloss.pth'
     checkpoint_path_final = data_save_path + f'Checkpoint/seed/{config["seed"]}/lr_{lr}_bs_{batch_size}_final.pth'
@@ -658,7 +659,7 @@ if __name__ == "__main__":
 
     prev_paths = {}
     prev_paths['run_id'] = 'owlr25mz'
-    prev_paths['model_path'] =  "/data/engs-mlmi1/kebl6872/data/models/PromptUNet_lr_0.0005_bs_12_fs_12_[6_12_24_48]_3_2_5_5]/Checkpoint/seed/987/lr_0.0005_bs_12_lowloss.pth"
+    prev_paths['model_path'] =  "/data/kebl6872/data/models/PromptUNet_lr_0.0005_bs_12_fs_12_[6_12_24_48]_3_2_5_5]/Checkpoint/seed/987/lr_0.0005_bs_12_lowloss.pth"
     model = prompt_model_pipeline(config) # note to self get wandb resume functionality working
 
 

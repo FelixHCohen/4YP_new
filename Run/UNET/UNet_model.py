@@ -26,18 +26,19 @@ class conv_block(nn.Module):
 
         self.conv2 = nn.Conv2d(out_c, out_c, kernel_size=3, padding=1)
         # self.norm2 = norm
-
+        #self.norm = nn.BatchNorm2d(in_c,affine=False)
+        #self.norm2 = nn.BatchNorm2d(out_c,affine=False)
         self.relu = nn.ReLU()
 
     def forward(self, inputs):
         x = self.conv1(inputs)
         # x = self.norm1(x, self.norm_name)
-        x = norm(x, self.norm_name)
+        x = norm(x,self.norm_name)
         x = self.relu(x)
 
         x = self.conv2(x)
         # x = self.norm2(x, self.norm_name)
-        x = norm(x, self.norm_name)
+        x = norm(x,self.norm_name)
         x = self.relu(x)
 
         return x
